@@ -9,6 +9,9 @@
 // http://www.openobject.org/opensourceurbanism/Bike_POV_Beta_4 // Font renderer, jay!
 // http://playground.arduino.cc/Code/BitMath // Bit manipulation hurts my brain!
 
+// Challenge: 5*7*56*50*16 = 1568000 bps to the shift registers.
+// 800 frame updates aka interrupts / second.
+
 #include "font.h"
 
 int latchPin = 10;
@@ -58,14 +61,14 @@ screenbuffer[activebuffer][3][0] = 0x54211;
 screenbuffer[activebuffer][4][0] = 0x37BD1;
 screenbuffer[activebuffer][5][0] = 0x54631;
 screenbuffer[activebuffer][6][0] = 0x97BD1;*/
-  printLetter('M',0);
-  printLetter('a',5);
-  printLetter('a',10);
-  printLetter('k',15);
-  printLetter('p',20);
-  printLetter('l',25);
-  printLetter('e',30);  
-  printLetter('k',35);    
+  printChar('H',0);
+  printChar('a',5);
+  printChar('a',10);
+  printChar('k',15);
+  printChar('p',20);
+  printChar('l',25);
+  printChar('e',30);  
+  printChar('k',35);    
 }
 
 void loop() {
@@ -93,14 +96,16 @@ void updatescreen() {
     }    
     // Flick the latch
     digitalWrite(latchPin, 1);
-    delay(1);
+  //  delay(1);
     digitalWrite(latchPin, 0);
     // Turn on next row.
     digitalWrite(i + 13, 0);    
   }
 }
 
-void printLetter(char ch, byte pos)
+void printString();
+
+void printChar(char ch, byte pos)
 {  
   // The display is 40 bits wide, the buffer only 32. Time to select the correct one.
   int bufferpos = 0;
@@ -126,10 +131,17 @@ void printLetter(char ch, byte pos)
     else {
       bufferpointer = 1;
       bufferlength = 7;
-      bufferpos = pos - 31;
+      bufferpos = pos - 8;
     }
     
-    // bit shift through the byte set it in the buffer
+    // 0 1 2 3 4
+    // 30
+    
+    //  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
+    // 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0 
+    //                                                                                                  7  6  5  4  3  2  1  0
+    
+    // bit shift through the byte, set it in the buffer
     for (int j=0; j<7; j++) {
       if (b & (1 << j)) {        
         bitSet(screenbuffer[activebuffer][j][bufferpointer], 31-i-bufferpos);
@@ -142,13 +154,7 @@ void printLetter(char ch, byte pos)
 }
 
 void updatebuffer() {
-//  Serial.println(i);
- // if (screenbuffer[activebuffer][0][0] > 0)
- // {
- //   screenbuffer[activebuffer][0][0] = screenbuffer[activebuffer][0][0] <<1; // shift the outputpattern left by one bit
- // } 
- // else {
-//    screenbuffer[activebuffer][0][0] = 2863310165;
-//  }
- 
+  for (i = 0; i < sizeof(source); i++){
+    printf("%c", source[i]);
+  }
 }
