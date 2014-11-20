@@ -18,12 +18,16 @@ int latchPin = 10;
 int clockPin = 11;
 int dataPin = 12;
 
-unsigned long screenbuffer[2][7][2];
+unsigned long screenbuffer[2][7][5];
+
+long interval = 1000;           // interval at which to 'hop' (milliseconds)
+unsigned long previousMillis = 0;
+
+int incomingByte = 0;   // for incoming serial data
+int incomingPos = 0;
 
 byte activebuffer = 0;
 byte passivebuffer = 1;
-
-unsigned long lastmilli;
 
 void setup() {
  pinMode(latchPin, OUTPUT);
@@ -61,7 +65,7 @@ screenbuffer[activebuffer][3][0] = 0x54211;
 screenbuffer[activebuffer][4][0] = 0x37BD1;
 screenbuffer[activebuffer][5][0] = 0x54631;
 screenbuffer[activebuffer][6][0] = 0x97BD1;*/
-  printChar('H',0);
+ /* printChar('M',0);
   printChar('a',5);
   printChar('a',10);
   printChar('k',15);
@@ -69,24 +73,61 @@ screenbuffer[activebuffer][6][0] = 0x97BD1;*/
   printChar('l',25);
   printChar('e',30);  
   printChar('k',35);    
+  printChar('j',40);    
+  printChar('e',45);    */ 
+  char tekst[29] = "Maakplek";
+  printString(tekst, 0, activebuffer);
 }
 
 void loop() {
+  unsigned long currentMillis = millis();
+  
+  if(currentMillis - previousMillis > interval) {
+    // save the last time you blinked the LED 
+    previousMillis = currentMillis;   
+    // if the LED is off turn it on and vice-versa:
+    //updatebuffer();
+
+  }  
   updatescreen();
-  updatebuffer();
+
+  communicate();
 }
+
+void communicate () {
+  // send data only when you receive data:
+  if (Serial.available() > 0) {
+    // read the incoming byte:
+    incomingByte = Serial.read();
+ 
+    printChar(incomingByte, incomingPos, activebuffer);
+    incomingPos = incomingPos + 5;
+    if (incomingPos > 28*5) {
+              incomingPos = 0;
+    }
+  }
+}
+        
 
 void updatescreen() {
   // 7 rows
   for (int i=0 ; i < 7; i++) {
 
-    // Update row.
-    shiftOut(dataPin, clockPin, LSBFIRST, screenbuffer[activebuffer][i][1]);    
+    
+/*    shiftOut(dataPin, clockPin, LSBFIRST, screenbuffer[activebuffer][i][1]);    
     shiftOut(dataPin, clockPin, LSBFIRST, screenbuffer[activebuffer][i][0]); 
     shiftOut(dataPin, clockPin, LSBFIRST, (screenbuffer[activebuffer][i][0] >> 8)); 
     shiftOut(dataPin, clockPin, LSBFIRST, (screenbuffer[activebuffer][i][0] >> 16));
-    shiftOut(dataPin, clockPin, LSBFIRST, (screenbuffer[activebuffer][i][0] >> 24)); 
+    shiftOut(dataPin, clockPin, LSBFIRST, (screenbuffer[activebuffer][i][0] >> 24)); */
     
+    // Update row.
+    for (int j = 5; j >= 0; j--) {
+      shiftOut(dataPin, clockPin, LSBFIRST, screenbuffer[activebuffer][i][j]); 
+      shiftOut(dataPin, clockPin, LSBFIRST, (screenbuffer[activebuffer][i][j] >> 8)); 
+      shiftOut(dataPin, clockPin, LSBFIRST, (screenbuffer[activebuffer][i][j] >> 16));
+      shiftOut(dataPin, clockPin, LSBFIRST, (screenbuffer[activebuffer][i][j] >> 24)); 
+    }
+
     // Turn off row.
     if (i == 0) {
       digitalWrite(19, 1);
@@ -103,14 +144,10 @@ void updatescreen() {
   }
 }
 
-void printString();
-
-void printChar(char ch, byte pos)
+void printChar(char ch, byte charPos, byte bufferpointer)
 {  
   // The display is 40 bits wide, the buffer only 32. Time to select the correct one.
   int bufferpos = 0;
-  int bufferlength = 31;  
-  int bufferpointer = 0;
   
   // make sure the character is within the alphabet bounds (defined by the font.h file)
   // if it's not, make it a blank character
@@ -121,40 +158,54 @@ void printChar(char ch, byte pos)
   // subtract the space character (converts the ASCII number to the font index number)
   ch -= 32;
   // step through each byte of the character array
-  for (int i=0; i<5; i++) {
-    byte b = font[ch][i];
-    if (i+pos <= 31) {
-      bufferpointer = 0;
-      bufferlength = 31;
-      bufferpos = pos;
-    }
-    else {
-      bufferpointer = 1;
-      bufferlength = 7;
-      bufferpos = pos - 8;
-    }
-    
-    // 0 1 2 3 4
-    // 30
-    
+  for (int charCol=0; charCol<5; charCol++) {
+    byte b = font[ch][charCol];
+
+    bufferpointer = (charCol+charPos)/32;
+    bufferpos = charPos - (32 * bufferpointer);
+        
     //  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
     // 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0 
+    //                                                                                                 31 30 29 28 27 26 25 24
     //                                                                                                  7  6  5  4  3  2  1  0
+
     
     // bit shift through the byte, set it in the buffer
-    for (int j=0; j<7; j++) {
-      if (b & (1 << j)) {        
-        bitSet(screenbuffer[activebuffer][j][bufferpointer], 31-i-bufferpos);
+    for (int row=0; row<7; row++) {
+      if (b & (1 << row)) {        
+        bitSet(screenbuffer[activebuffer][row][bufferpointer], 31-charCol-bufferpos);
       }
       else {
-        bitClear(screenbuffer[activebuffer][j][bufferpointer], 31-i-bufferpos);
+        bitClear(screenbuffer[activebuffer][row][bufferpointer], 31-charCol-bufferpos);
       }
     }
   }
 }
 
-void updatebuffer() {
-  for (i = 0; i < sizeof(source); i++){
-    printf("%c", source[i]);
+void printString(char* source, byte pos, char bufferpointer) {
+  int i;
+  for (i = 0; i < strlen(source); i++){
+    printChar(source[i], pos+i*5, bufferpointer);
   }
+}
+
+void updatebuffer() {
+  for (int col=0; col<=4; col++) {
+    for (int row=0; row<7; row++) {
+      screenbuffer[passivebuffer][row][col] = screenbuffer[activebuffer][row][col-1];
+      /*if (b & (1 << row)) {        
+        bitSet(screenbuffer[activebuffer][row][bufferpointer], 31-charCol-bufferpos);
+      }
+      else {
+        bitClear(screenbuffer[activebuffer][row][bufferpointer], 31-charCol-bufferpos);
+      }     */ 
+    }
+  }
+  switchbuffer();
+}
+
+void switchbuffer() {
+  activebuffer = activebuffer xor passivebuffer;
+  passivebuffer = activebuffer xor passivebuffer;
+  activebuffer = activebuffer xor passivebuffer;
 }
